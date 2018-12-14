@@ -67,7 +67,7 @@ def init_logging(default_level=logging.WARNING):
               " %(message)s")
     handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter(logfmt)
-    #handler.setFormatter(formatter)
+    handler.setFormatter(formatter)
     for name in loggers:
         logger = logging.getLogger(name)
         if not name.startswith('manticore'):
