@@ -16,7 +16,6 @@ log.init_logging()
 
 consts = config.get_group('main')
 
-
 class Manticore(ManticoreBase):
     def __init__(self, path_or_state, argv=None, workspace_url=None, policy='random', **kwargs):
         """
@@ -131,7 +130,7 @@ def _make_decree(program, concrete_start='', **kwargs):
     return initial_state
 
 
-def _make_linux(program, argv=None, env=None, entry_symbol=None, symbolic_files=None, concrete_start='', pure_symbolic=False, stdin_size=consts.stdin_size):
+def _make_linux(program, argv=None, env=None, entry_symbol=None, symbolic_files=None, concrete_start='', pure_symbolic=False, stdin_size=consts.stdin_size, auto_load=True):
     from ..platforms import linux
 
     env = {} if env is None else env
@@ -143,7 +142,7 @@ def _make_linux(program, argv=None, env=None, entry_symbol=None, symbolic_files=
     constraints = ConstraintSet()
     platform = linux.SLinux(program, argv=argv, envp=env,
                             symbolic_files=symbolic_files,
-                            pure_symbolic=pure_symbolic)
+                            pure_symbolic=pure_symbolic, auto_load=auto_load)
     if entry_symbol is not None:
         entry_pc = platform._find_symbol(entry_symbol)
         if entry_pc is None:

@@ -389,7 +389,7 @@ class Linux(Platform):
     RLIMIT_NOFILE = 7  # /* max number of open files */
     FCNTL_FDCWD = -100  # /* Special value used to indicate openat should use the cwd */
 
-    def __init__(self, program, argv=None, envp=None, disasm='capstone', **kwargs):
+    def __init__(self, program, argv=None, envp=None, disasm='capstone', auto_load=True, **kwargs):
         '''
         Builds a Linux OS platform
         :param string program: The path to ELF binary
@@ -400,6 +400,10 @@ class Linux(Platform):
         :type files: list[Socket] or list[File]
         '''
         super().__init__(path=program, **kwargs)
+
+        logger.debug("auto_load set to %s" % auto_load)
+        self.auto_load = auto_load
+
 
         self.program = program
         self.clocks = 0
@@ -895,21 +899,24 @@ class Linux(Platform):
 
         # Get interpreter elf
         interpreter = None
-        for elf_segment in elf.iter_segments():
-            if elf_segment.header.p_type != 'PT_INTERP':
-                continue
-            interpreter_filename = elf_segment.data()[:-1]
-            logger.info(f'Interpreter filename: {interpreter_filename}')
-            if os.path.exists(interpreter_filename.decode('utf-8')):
-                interpreter = ELFFile(open(interpreter_filename, 'rb'))
-            elif 'LD_LIBRARY_PATH' in env:
-                for mpath in env['LD_LIBRARY_PATH'].split(":"):
-                    interpreter_path_filename = os.path.join(mpath, os.path.basename(interpreter_filename))
-                    logger.info(f"looking for interpreter {interpreter_path_filename}")
-                    if os.path.exists(interpreter_path_filename):
-                        interpreter = ELFFile(open(interpreter_path_filename, 'rb'))
-                        break
-            break
+
+        if self.auto_load:
+            for elf_segment in elf.iter_segments():
+                if elf_segment.header.p_type != 'PT_INTERP':
+                    continue
+                interpreter_filename = elf_segment.data()[:-1]
+                logger.info(f'Interpreter filename: {interpreter_filename}')
+                if os.path.exists(interpreter_filename.decode('utf-8')):
+                    interpreter = ELFFile(open(interpreter_filename, 'rb'))
+                elif 'LD_LIBRARY_PATH' in env:
+                    for mpath in env['LD_LIBRARY_PATH'].split(":"):
+                        interpreter_path_filename = os.path.join(mpath, os.path.basename(interpreter_filename))
+                        logger.info(f"looking for interpreter {interpreter_path_filename}")
+                        if os.path.exists(interpreter_path_filename):
+                            interpreter = ELFFile(open(interpreter_path_filename, 'rb'))
+                            break
+                break
+
         if interpreter is not None:
             assert interpreter.get_machine_arch() == elf.get_machine_arch()
             assert interpreter.header.e_type in ['ET_DYN', 'ET_EXEC']
@@ -2447,10 +2454,11 @@ class SLinux(Linux):
     :param list argv: argv not including binary
     :param list envp: environment variables
     :param tuple[str] symbolic_files: files to consider symbolic
+    :param bool auto_load: auto load dynamic libraries
     """
 
     def __init__(self, programs, argv=None, envp=None, symbolic_files=None,
-                 disasm='capstone', pure_symbolic=False):
+                 disasm='capstone', pure_symbolic=False, auto_load=True):
         argv = [] if argv is None else argv
         envp = [] if envp is None else envp
         symbolic_files = [] if symbolic_files is None else symbolic_files
@@ -2459,7 +2467,7 @@ class SLinux(Linux):
         self._pure_symbolic = pure_symbolic
         self.random = 0
         self.symbolic_files = symbolic_files
-        super().__init__(programs, argv=argv, envp=envp, disasm=disasm)
+        super().__init__(programs, argv=argv, envp=envp, disasm=disasm, auto_load=auto_load)
 
     def _mk_proc(self, arch):
         if arch in {'i386', 'armv7'}:
